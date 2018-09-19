@@ -1,14 +1,47 @@
+import sklearn.decomposition as dec
+from typing import Iterable, Union, List, Optional
+
+
 class ReductionRule:
-    def effective_components(self, pca) -> slice:
+    def effective_components(self, pca: dec.PCA) -> slice:
         raise NotImplementedError()
 
-    def effective_dim(self, pca):
+    def effective_dim(self, pca: dec.PCA) -> int:
+        """
+        Calculate an effective dimensionality
+
+        Args:
+            pca: dec.PCA
+
+        Returns:
+            number of dimesion
+        """
+
         dim_slice = self.effective_components(pca)
         return dim_slice.stop - dim_slice.start
 
+    def effective_ccr(self, pca: dec.PCA) -> float:
+        """
+        Calculate a cumulative contribution rate of the effective dimensionality
+
+        Args:
+            pca: pca engine
+
+        Returns:
+            ccr <- [0, 1]
+        """
+
+        dim = self.effective_dim(pca)
+        ccr = 0.
+
+        for lamb in pca.explained_variance_ratio_[:dim]:
+            ccr += lamb
+
+        return ccr
+
 
 class FixedDimensionalityReduction(ReductionRule):
-    def __init__(self, dim=None):
+    def __init__(self, dim: int):
         """
         Specify fixed dimensionality; None means no reduction.
         Args:
@@ -16,12 +49,12 @@ class FixedDimensionalityReduction(ReductionRule):
         """
         self.dim = dim
 
-    def effective_components(self, pca):
-        if pca.n_components < dim:
+    def effective_components(self, pca: dec.PCA):
+        if pca.n_components_ < self.dim:
             raise ValueError(f'Output dimensionality must be smaller than n_components_, '
                              f'but dim={self.dim} > {pca.n_components_} has specified')
 
-        return slice(0, dim)
+        return slice(0, self.dim)
 
     def calc_ccr(self, pca):
         return pca.explained_variance_ratio_[0:self.dim].sum()

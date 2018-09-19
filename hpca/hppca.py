@@ -6,6 +6,13 @@ from hpca.reduction_rule import ReductionRule, ContributionRateReduction, FixedD
 
 class HPPCA:
     def __init__(self, n_blocks: int, **kargs):
+        """
+
+        Args:
+            n_blocks: number of intermediate PPCAs
+            **kargs: argument specification of PPCAs
+        """
+
         self.intermediates_ = [dec.PCA(**kargs) for _ in range(n_blocks)]
         self.gate_ = dec.PCA(**kargs)
 
@@ -19,12 +26,13 @@ class HPPCA:
 
     def set_blockmask(self, mask: Iterable):
         """
+        Assign component to each group with the mask array
 
         Args:
-            mask:
+            mask: list of sequence [0..n_blocks] corresponding to the indices
 
         Returns:
-
+            None
         """
 
         block_ids = sorted(set(mask))
@@ -42,12 +50,13 @@ class HPPCA:
 
     def set_blockname(self, names: Iterable):
         """
+        Set names for the each block
 
         Args:
-            names:
+            names: list of string which has the length n_blocks
 
         Returns:
-
+            None
         """
 
         if len(names) != self.n_blocks_:
@@ -58,13 +67,14 @@ class HPPCA:
     def set_intermediate_reducer(self, reducers: Union[ReductionRule, List[ReductionRule]],
                                  id: Optional[int] = None):
         """
+        Assign reduction rules to intermediate PPCAs
 
         Args:
-            reducers:
-            id:
+            reducers: ReductionRule or list of ReductionRule which has a length n_blocks
+            id: specifies the index to assign a rule when the single assignation
 
         Returns:
-
+            None
         """
 
         if isinstance(reducers, list):
@@ -80,10 +90,27 @@ class HPPCA:
             self.intermediate_reducers_[id] = reducers
 
     def set_gate_reducer(self, reducer: ReductionRule):
+        """
+        Assign reduction rule to a gate PPCA
+
+        Args:
+            reducer: ReductionRule
+
+        Returns:
+            None
+
+        """
         self.gate_reducer_ = reducer
 
     @property
-    def blocks_(self):
+    def blocks_(self) -> List[int]:
+        """
+        return block masks
+
+        Returns:
+            List[int]
+        """
+
         return self.block_masks_
 
     def __decompose_blocks(self, X: numpy.ndarray) -> List[numpy.ndarray]:
@@ -101,7 +128,7 @@ class HPPCA:
 
         return blocks
 
-    def __zerofill_reduced_repr(self, Y: numpy.ndarray, pca: dec.PCA):
+    def __zerofill_reduced_repr(self, Y: numpy.ndarray, pca: dec.PCA) -> numpy.ndarray:
         N, dim_reduced = Y.shape
         raw_dim = pca.n_components_
 
@@ -109,7 +136,7 @@ class HPPCA:
 
         return numpy.hstack((Y, zeros_to_fill))
 
-    def list2dic(self, X):
+    def list2dic(self, X: numpy.ndarray):
         """
         convert listed feature into named hash
 
@@ -121,7 +148,7 @@ class HPPCA:
         """
         return {name: block for name, block in zip(self.__decompose_blocks(X), self.block_names_)}
 
-    def dic2list(self, X):
+    def dic2list(self, X: numpy.ndarray):
         """
         convert feature dictionary into flattened list
 
@@ -131,28 +158,79 @@ class HPPCA:
         Returns:
             numpy.array
         """
-        pass
+        raise NotImplementedError()
 
-    def fit_intermediates(self, X):
+    def fit_intermediates(self, X: numpy.ndarray):
+        """
+        Train intermediate PPCAs
+
+        Args:
+            X: data to fit which have a shape (N, d)
+
+        Returns:
+            None
+        """
         decomposed_X = self.__decompose_blocks(X)
 
         for block_X, block_pca in zip(decomposed_X, self.intermediates_):
             block_pca.fit(block_X)
 
-    def fit(self, X):
+    def fit(self, X: numpy.ndarray):
+        """
+        Train entire HPPCA
+
+        Args:
+            X: data to fit which have a shape (N, d)
+
+        Returns:
+            None
+        """
+
         self.fit_intermediates(X)
         intermediate_repr = self.intermediate_transform(X)
         self.gate_.fit(intermediate_repr)
 
-    def reconstruct(self, X):
+    def reconstruct(self, X: numpy.ndarray) -> numpy.ndarray:
+        """
+        Reconstruct the input from the hierarchical dimensionality reduction with HPPCA,
+        that means a flow, X -> intermediate reduction -> gate reduction -> gate recon. -> intermediate recon.
+
+        Args:
+            X: data to reconstruct which have a shape (N, d)
+
+        Returns:
+            reconstructed X
+        """
+
         reduced_repr = self.transform(X)
         return self.inverse_transform(reduced_repr)
 
-    def reconstruct_intermediate(self, X):
+    def reconstruct_intermediate(self, X: numpy.ndarray) -> numpy.ndarray:
+        """
+        Reconstruct the input from the intermediate reduced representation.
+        that means a flow, X -> intermediate reduction -> intermediate recon.
+
+        Args:
+            X: data to reconstruct which have a shape (N, d)
+
+        Returns:
+            reconstructed X from the intermediate PPCAs
+        """
+
         reduced_repr_intr = self.intermediate_transform(X)
         return self.intermediate_inverse_transform(reduced_repr_intr)
 
-    def inverse_transform(self, Y):
+    def inverse_transform(self, Y: numpy.ndarray) -> numpy.ndarray:
+        """
+        Reconstruct the reduced representation of gate-PPCA into an input space.
+
+        Args:
+            Y: reduced represetation of HPPCA
+
+        Returns:
+            reconstructed feature
+        """
+
         Y_filled = self.__zerofill_reduced_repr(Y, self.gate_)
         intermediate_reduced_repr = self.gate_.inverse_transform(Y_filled)
 
@@ -160,7 +238,17 @@ class HPPCA:
 
         return self.intermediate_inverse_transform(Y_intr)
 
-    def intermediate_inverse_transform(self, Y_intr):
+    def intermediate_inverse_transform(self, Y_intr: numpy.ndarray) -> numpy.ndarray:
+        """
+        Reconstruct the reduced representation of intermediate-PPCAs into an input space.
+
+        Args:
+            Y_intr: reduced repr. of intermediate PPCAs
+
+        Returns:
+            reconstructed feature
+        """
+
         dims = [reduction.effective_dim(pca)
                 for reduction, pca in zip(self.intermediate_reducers_, self.intermediates_)]
 
@@ -176,7 +264,17 @@ class HPPCA:
 
         return numpy.hstack(buffer)
 
-    def transform(self, X):
+    def transform(self, X: numpy.ndarray) -> numpy.ndarray:
+        """
+        Convert(reduce) features into a reduced representation
+
+        Args:
+            X: (N, d)
+
+        Returns:
+            X: (N, d')
+        """
+
         intermediate_repr = self.intermediate_transform(X)
         return self.gate_.transform(intermediate_repr)
 
