@@ -1,7 +1,8 @@
 ## Description
 Python implementation of Hierarchical Probabilistic Principal Component Analysis proposed in [1].
 
-HPPCA improves 
+HPPCA significantly improves dimesionality reduction performance by absorbing our prior knowledge about 
+the group structure of the features and by decreasing the number of parameter from individual components.
 
 ![vis](https://github.com/tochikuji/GitHub-Assets/blob/master/images/hppca.png?raw=true)
 _originated from [1]._
