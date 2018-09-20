@@ -33,3 +33,9 @@ See `examples`
 ## References
 
 [1] Aiga Suzuki, Hayaru Shouno, "Generative Model of Textures Using Hierarchical Probabilistic Principal Component Analysis", Proc. of PDPTA’17, CSREA Press, pp.333-338, 2017.
+
+## License
+Apache License v2.0, refer to `LICENSE` for more detail.
+
+## Author
+Aiga SUZUKI <tochikuji@gmail.com>
